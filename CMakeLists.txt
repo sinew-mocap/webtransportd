@@ -149,7 +149,7 @@ target_link_libraries(vendored PUBLIC Threads::Threads ${PLATFORM_LIBS})
 # #define).  The shim lives in our tree; compile it with -w alongside the
 # rest of the vendor pile so all vendor tests resolve the symbol.
 if(WIN32)
-    target_sources(vendored PRIVATE src/adapters/wtd_wincompat.c)
+    target_sources(vendored PRIVATE adapters/wtd_wincompat.c)
     target_include_directories(vendored SYSTEM PRIVATE ${VENDOR_INCLUDES})
 endif()
 
@@ -162,9 +162,9 @@ if(WIN32)
         OUTPUT  "${RC_OBJ}"
         COMMAND windres -O coff
                 -o "${RC_OBJ}"
-                "${CMAKE_SOURCE_DIR}/src/core/windows/webtransportd.rc"
-        DEPENDS src/core/windows/webtransportd.rc
-                src/core/windows/webtransportd.exe.manifest
+                "${CMAKE_SOURCE_DIR}/adapters/windows/webtransportd.rc"
+        DEPENDS adapters/windows/webtransportd.rc
+                adapters/windows/webtransportd.exe.manifest
     )
     add_custom_target(webtransportd_rc DEPENDS "${RC_OBJ}")
     set(WINRES_EXTRA "${RC_OBJ}")
@@ -173,31 +173,34 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
-# Our source files — organized as a ports-and-adapters hexagon:
-#   app      — composition root (CLI + wiring)
-#   domain   — the hexagon core (pure session policy + codec, no QUIC/OS)
-#   adapters — driven/driving edges (picoquic transport, child process &
-#              output reader, autocert, logging)
-# Port interfaces are header-only under src/include/ports.
+# Our source files — a ports-and-adapters hexagon, matching the sinew-mocap
+# cluster convention (top-level core/ + ports/ + adapters/):
+#   core/     the hexagon core (pure session policy + codec, no QUIC/OS)
+#   ports/    port interfaces (header-only)
+#   adapters/ driven/driving edges + composition root: picoquic transport,
+#             child process & output reader, autocert, logging, CLI, main
+# Headers are included by bare name with core/ports/adapters on the path.
 # ---------------------------------------------------------------------------
+set(OUR_INCLUDES core ports adapters)
+
 set(DAEMON_SRCS
-    src/app/main.c
-    src/domain/session.c
-    src/domain/frame.c
-    src/domain/work_queue.c
-    src/adapters/transport_picoquic.c
-    src/adapters/child_output.c
-    src/adapters/autocert.c
-    src/adapters/child_process.c
-    src/adapters/log.c
-    src/app/cmdline.c
+    adapters/main.c
+    core/session.c
+    core/frame.c
+    core/work_queue.c
+    adapters/transport_picoquic.c
+    adapters/child_output.c
+    adapters/autocert.c
+    adapters/child_process.c
+    adapters/log.c
+    adapters/cmdline.c
 )
 
 # ---------------------------------------------------------------------------
 # webtransportd binary
 # ---------------------------------------------------------------------------
 add_executable(webtransportd ${DAEMON_SRCS} ${WINRES_EXTRA})
-target_include_directories(webtransportd PRIVATE src/include)
+target_include_directories(webtransportd PRIVATE ${OUR_INCLUDES})
 target_include_directories(webtransportd SYSTEM PRIVATE ${VENDOR_INCLUDES})
 target_compile_definitions(webtransportd PRIVATE ${PICOQUIC_DEFS})
 target_link_libraries(webtransportd vendored ${PLATFORM_LDEXTRA})
@@ -208,13 +211,13 @@ endif()
 # ---------------------------------------------------------------------------
 # Examples
 # ---------------------------------------------------------------------------
-add_executable(echo examples/echo.c src/domain/frame.c)
-target_include_directories(echo PRIVATE src/include)
+add_executable(echo examples/echo.c core/frame.c)
+target_include_directories(echo PRIVATE ${OUR_INCLUDES})
 set_target_properties(echo PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/examples")
 
 add_executable(frame_hi examples/frame_hi.c)
-target_include_directories(frame_hi PRIVATE src/include)
+target_include_directories(frame_hi PRIVATE ${OUR_INCLUDES})
 set_target_properties(frame_hi PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/examples")
 
@@ -225,8 +228,8 @@ enable_testing()
 
 # Helper: link a test against the full vendored stack
 function(add_vendor_test name)
-    add_executable(${name} tests/unit/${name}.c ${ARGN})
-    target_include_directories(${name} PRIVATE src/include)
+    add_executable(${name} tests/${name}.c ${ARGN})
+    target_include_directories(${name} PRIVATE ${OUR_INCLUDES})
     target_include_directories(${name} SYSTEM PRIVATE ${VENDOR_INCLUDES})
     target_compile_definitions(${name} PRIVATE ${PICOQUIC_DEFS})
     target_link_libraries(${name} vendored ${PLATFORM_LDEXTRA})
@@ -236,35 +239,35 @@ endfunction()
 
 # Helper: link a test against only our code (no vendored stack)
 function(add_unit_test name)
-    add_executable(${name} tests/unit/${name}.c ${ARGN})
-    target_include_directories(${name} PRIVATE src/include)
+    add_executable(${name} tests/${name}.c ${ARGN})
+    target_include_directories(${name} PRIVATE ${OUR_INCLUDES})
     target_link_libraries(${name} Threads::Threads ${PLATFORM_LIBS})
     add_test(NAME ${name} COMMAND ${name}
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 endfunction()
 
 # Unit tests — our code only
-add_unit_test(frame_test         src/domain/frame.c)
-add_unit_test(frame_fuzz_test    src/domain/frame.c)
-add_unit_test(frame_helper_test  src/domain/frame.c)
-add_unit_test(log_test           src/adapters/log.c)
-add_unit_test(env_test           src/adapters/env.c)
-add_unit_test(cmdline_test       src/app/cmdline.c)
-add_unit_test(work_queue_test    src/domain/work_queue.c)
-add_unit_test(session_test       src/domain/session.c src/domain/work_queue.c
-                                 src/domain/frame.c src/adapters/log.c)
-add_unit_test(child_output_test  src/adapters/child_output.c src/domain/session.c
-                                 src/domain/work_queue.c src/domain/frame.c
-                                 src/adapters/log.c)
-add_unit_test(child_process_test src/adapters/child_process.c src/app/cmdline.c)
+add_unit_test(frame_test         core/frame.c)
+add_unit_test(frame_fuzz_test    core/frame.c)
+add_unit_test(frame_helper_test  core/frame.c)
+add_unit_test(log_test           adapters/log.c)
+add_unit_test(env_test           adapters/env.c)
+add_unit_test(cmdline_test       adapters/cmdline.c)
+add_unit_test(work_queue_test    core/work_queue.c)
+add_unit_test(session_test       core/session.c core/work_queue.c
+                                 core/frame.c adapters/log.c)
+add_unit_test(child_output_test  adapters/child_output.c core/session.c
+                                 core/work_queue.c core/frame.c
+                                 adapters/log.c)
+add_unit_test(child_process_test adapters/child_process.c adapters/cmdline.c)
 
 # autocert needs mbedtls so use the vendor helper
-add_vendor_test(autocert_test src/adapters/autocert.c)
+add_vendor_test(autocert_test adapters/autocert.c)
 
 # Exec tests — self-contained, just exec ./webtransportd
 foreach(_t version_test selftest_test help_test)
-    add_executable(${_t} tests/unit/${_t}.c)
-    target_include_directories(${_t} PRIVATE src/include)
+    add_executable(${_t} tests/${_t}.c)
+    target_include_directories(${_t} PRIVATE ${OUR_INCLUDES})
     target_link_libraries(${_t} Threads::Threads ${PLATFORM_LIBS})
     add_test(NAME ${_t} COMMAND ${_t}
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
@@ -274,15 +277,15 @@ endforeach()
 # Windows manifest test
 if(WIN32)
     add_executable(windows_manifest_test
-        tests/unit/windows_manifest_test.c "${RC_OBJ}")
-    target_include_directories(windows_manifest_test PRIVATE src/include)
+        tests/windows_manifest_test.c "${RC_OBJ}")
+    target_include_directories(windows_manifest_test PRIVATE ${OUR_INCLUDES})
     target_link_libraries(windows_manifest_test Threads::Threads ${PLATFORM_LIBS})
     add_dependencies(windows_manifest_test webtransportd_rc)
     add_test(NAME windows_manifest_test COMMAND windows_manifest_test
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 else()
-    add_executable(windows_manifest_test tests/unit/windows_manifest_test.c)
-    target_include_directories(windows_manifest_test PRIVATE src/include)
+    add_executable(windows_manifest_test tests/windows_manifest_test.c)
+    target_include_directories(windows_manifest_test PRIVATE ${OUR_INCLUDES})
     add_test(NAME windows_manifest_test COMMAND windows_manifest_test
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 endif()

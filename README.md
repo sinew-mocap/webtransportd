@@ -116,7 +116,7 @@ For example, a 5-byte reliable frame carrying `Hello`:
 0x48 0x65 0x6c 0x6c 0x6f  # "Hello"
 ```
 
-See [`frame.h`](frame.h) for the encode/decode implementation.
+See [`core/frame.h`](core/frame.h) for the encode/decode implementation.
 
 `examples/frame-helper.sh` constructs a single frame on stdout, useful for offline testing:
 

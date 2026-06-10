@@ -34,8 +34,8 @@
 #ifndef WEBTRANSPORTD_SESSION_H
 #define WEBTRANSPORTD_SESSION_H
 
-#include "ports/child_port.h"
-#include "ports/transport_port.h"
+#include "child_port.h"
+#include "transport_port.h"
 #include "work_queue.h"
 
 #include <stdatomic.h>
