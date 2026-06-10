@@ -7,7 +7,7 @@ int main(void) {
 	return 0;
 }
 #else
-/* Cycle 43: --dir=<path> static file serving alongside WebTransport.
+/* --dir=<path> static file serving alongside WebTransport.
  *
  * Tests that the daemon can serve static files from a directory on
  * non-WT HTTP/3 paths (all paths except /wt). A GET to /index.html
@@ -130,9 +130,8 @@ static int wait_for_ready(daemon_t *d, int timeout_ms) {
 	return -1;
 }
 
-/* Cycle 43: drain_stdout helpers kept for GREEN phase when full
- * HTTP/3 client test is added. For now, marked unused to keep -Werror
- * clean in RED phase. */
+/* drain_stdout helpers for a fuller HTTP/3 client test. Compiled out for
+ * now, so -Werror stays clean. */
 #if 0
 static void drain_stdout(int fd, char *buf, size_t cap, size_t *len,
 		int quiet_ms) {

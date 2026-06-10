@@ -1,28 +1,22 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
 #ifdef _WIN32
-/* POSIX-only test (fork+exec / sys/wait / arpa/inet). Cross-
- * compilation on mingw would need CreateProcess + Winsock
- * ports of the harness. Until that cycle lands, skip on
- * Windows so the build is green. The test body is still
- * compiled and run on linux-gcc + macos-clang. */
+/* POSIX-only test (fork+exec / sys/wait / arpa/inet). On Windows it
+ * skips: the harness needs CreateProcess + Winsock ports. The body
+ * still compiles and runs on linux-gcc + macos-clang. */
 #include <stdio.h>
 int main(void) {
     fprintf(stderr, "SKIP: POSIX-only test on Windows\n");
     return 0;
 }
 #else
-/* TDD log:
- * - Cycle 21d.2 (this file): in-process QUIC handshake. Two picoquic
- *   quic contexts (client + server, server with cert+key, both with
- *   matching default ALPN) share a simulated clock and exchange
- *   packets synchronously via picoquic_prepare_next_packet /
- *   picoquic_incoming_packet. We pump in a loop, advancing
- *   simulated_time each iteration, and assert both sides reach
- *   picoquic_state_ready before the iteration budget runs out.
- *
- *   No sockets, no pthread — so this sidesteps the ASAN/thread-start
- *   crash noted in cycle 21d.1. Real-socket handshake lives in 21d.3.
+/* handshake_test runs an in-process QUIC handshake. Two picoquic contexts
+ * (client and server, the server holding cert+key, both on a matching
+ * default ALPN) share a simulated clock and exchange packets synchronously
+ * via picoquic_prepare_next_packet / picoquic_incoming_packet. The loop
+ * advances simulated_time each iteration and asserts both sides reach
+ * picoquic_state_ready within the iteration budget. It uses no sockets and
+ * no pthread, sidestepping the ASAN crash in picoquic's thread-start path.
  */
 
 #include "picoquic.h"

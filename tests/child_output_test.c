@@ -1,10 +1,9 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
 #ifdef _WIN32
-/* POSIX-only test (pipe + pthread reader). The Windows child_output
- * adapter would need a CreateProcess/_pipe harness; until that cycle
- * lands, skip on Windows so the build stays green. The body still
- * compiles and runs on linux-gcc + macos-clang. */
+/* POSIX-only test (pipe + pthread reader). On Windows it skips: the
+ * child_output adapter would need a CreateProcess/_pipe harness. The
+ * body still compiles and runs on linux-gcc + macos-clang. */
 #include <stdio.h>
 int main(void) {
 	fprintf(stderr, "SKIP: POSIX-only test on Windows\n");

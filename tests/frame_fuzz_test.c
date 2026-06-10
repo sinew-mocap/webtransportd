@@ -1,26 +1,22 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
-/* TDD log:
- * - Cycle 24 (this file): deterministic fuzz harness for the frame
- *   codec. Two passes:
+/* frame_fuzz_test is a deterministic fuzz harness for the codec, in two
+ * passes:
  *
- *     1. fuzz_decode:  N random buffers (length 0..127, random
- *        bytes) fed to wtd_frame_decode. Every call must return a
- *        defined status code and — if OK — a (consumed, payload)
- *        triple that stays inside the input buffer. ASAN is the
- *        teeth: any OOB read from a malformed length prefix would
- *        trip it regardless of what the C-level assertions say.
+ *     1. fuzz_decode feeds N random buffers (length 0..127, random bytes)
+ *        to wtd_frame_decode. Every call returns a defined status code,
+ *        and an OK result yields a (consumed, payload) triple that stays
+ *        inside the input buffer. ASAN is the teeth: an OOB read from a
+ *        malformed length prefix trips it regardless of what the C-level
+ *        assertions say.
  *
- *     2. roundtrip:    N random (flag, payload_len, payload_bytes)
- *        inputs encoded and decoded; the result must match the
- *        input byte-for-byte. Exercises 1-byte and 2-byte varint
- *        length ranges; 4-byte varint is covered by frame_test's
- *        cycle 7.
+ *     2. roundtrip encodes and decodes N random (flag, payload_len,
+ *        payload_bytes) inputs; the result matches the input
+ *        byte-for-byte. It exercises the 1-byte and 2-byte varint length
+ *        ranges; frame_test covers the 4-byte form.
  *
- *   Seeded deterministically (srand(0xC0DE)) so a regression
- *   surfaces on the same iteration on every run. A future cycle
- *   can swap this for a libFuzzer coverage-guided harness without
- *   changing the assertions.
+ *   The seed is fixed (srand(0xC0DE)) so a regression surfaces on the
+ *   same iteration on every run.
  */
 
 #include "frame.h"

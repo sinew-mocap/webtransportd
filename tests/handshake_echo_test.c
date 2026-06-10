@@ -1,37 +1,25 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
 #ifdef _WIN32
-/* POSIX-only test (fork+exec / sys/wait / arpa/inet). Cross-
- * compilation on mingw would need CreateProcess + Winsock
- * ports of the harness. Until that cycle lands, skip on
- * Windows so the build is green. The test body is still
- * compiled and run on linux-gcc + macos-clang. */
+/* POSIX-only test (fork+exec / sys/wait / arpa/inet). On Windows it
+ * skips: the harness needs CreateProcess + Winsock ports. The body
+ * still compiles and runs on linux-gcc + macos-clang. */
 #include <stdio.h>
 int main(void) {
     fprintf(stderr, "SKIP: POSIX-only test on Windows\n");
     return 0;
 }
 #else
-/* TDD log:
- * - Cycle 22c: daemon-internal echo visible on daemon stdout.
- * - Cycle 22d: client-visible stream echo.
- * - Cycle 22e: datagram round-trip. Client enables picoquic's
- *   datagram transport parameter, sends "dgram" via
- *   picoquic_queue_datagram_frame in addition to the stream
- *   "world", and the client callback accumulates stream bytes
- *   and datagram bytes separately. Server-side: a flag=1 frame
- *   on the peer_session work queue gets echoed via
- *   picoquic_queue_datagram_frame instead of
- *   picoquic_add_to_stream.
- *
- * - Cycle 32: child switched from /bin/cat to ./examples/echo, a
- *   real C reference child that decodes framed stdin with
- *   wtd_frame_decode and re-encodes the payload with the same
- *   flag via wtd_frame_encode. Output is byte-equivalent to
- *   /bin/cat (both encoders produce shortest-form varints) but
- *   the round trip now exercises the frame codec on the child
- *   side too, proving the published framing spec matches what
- *   the codec emits.
+/* handshake_echo_test drives a full echo round-trip against the daemon.
+ * The client opens a stream "world" and, with picoquic's datagram
+ * transport parameter enabled, a datagram "dgram"; its callback
+ * accumulates stream and datagram bytes separately. The daemon echoes the
+ * stream payload back on the stream and a flag=1 frame back as a datagram
+ * (picoquic_queue_datagram_frame rather than picoquic_add_to_stream). The
+ * child is ./examples/echo, a C reference child that decodes framed stdin
+ * with wtd_frame_decode and re-encodes the payload under the same flag, so
+ * the round trip exercises the frame codec on the child side and confirms
+ * the published framing spec matches what the codec emits.
  */
 
 #include "picoquic.h"
@@ -58,14 +46,13 @@ static int failures = 0;
 #define FAIL(msg) do { fprintf(stderr, "FAIL %s:%d %s\n", __FILE__, __LINE__, msg); failures++; } while (0)
 #define EXPECT(cond) do { if (!(cond)) FAIL(#cond); } while (0)
 
-/* Cycle 33: pid-derived port, see handshake_socket_test.c banner.
- * Cycle 40c: UTF-8 sentinel bytes in PAYLOAD / DGRAM_PAYLOAD prove
- * the whole pipeline (QUIC stream/datagram → daemon frame codec →
- * child stdin pipe → examples/echo round-trip → child stdout pipe
- * → daemon frame decode → outbound echo) is byte-transparent for
- * non-ASCII UTF-8. "w日r" = `w (0x77) + 日 (U+65E5 → e6 97 a5) +
- * r (0x72)`; "d本m" = `d + 本 (U+672C → e6 9c ac) + m`. Both are
- * 5 bytes so the existing length assertions still hold. */
+/* The port is pid-derived. UTF-8 sentinel bytes in PAYLOAD /
+ * DGRAM_PAYLOAD prove the whole pipeline (QUIC stream/datagram → daemon
+ * frame codec → child stdin pipe → examples/echo round-trip → child
+ * stdout pipe → daemon frame decode → outbound echo) is byte-transparent
+ * for non-ASCII UTF-8. "w日r" = `w (0x77) + 日 (U+65E5 → e6 97 a5) +
+ * r (0x72)`; "d本m" = `d + 本 (U+672C → e6 9c ac) + m`. Both are 5 bytes,
+ * so the length assertions hold. */
 static uint16_t SERVER_PORT;
 static const char PAYLOAD[] = "w\xe6\x97\xa5r";       /* w日r, 5 bytes */
 static const char DGRAM_PAYLOAD[] = "d\xe6\x9c\xacm"; /* d本m, 5 bytes */
@@ -422,11 +409,11 @@ int main(void) {
 	fprintf(stderr, "[TEST] cli_rc=%d, stream_len=%zu, dgram_len=%zu\n",
 			cli_rc, cctx.stream_len, cctx.dgram_len);
 	EXPECT(cli_rc == 0);
-	/* Cycle 22d: client must see its own "world" come back on stream. */
+	/* The client sees its own "world" come back on the stream. */
 	EXPECT(cctx.stream_len == sizeof(PAYLOAD) - 1);
 	EXPECT(cctx.stream_len == sizeof(PAYLOAD) - 1
 			&& memcmp(cctx.stream_buf, PAYLOAD, sizeof(PAYLOAD) - 1) == 0);
-	/* Cycle 22e: and "dgram" comes back on the datagram channel. */
+	/* "dgram" comes back on the datagram channel. */
 	EXPECT(cctx.dgram_len == sizeof(DGRAM_PAYLOAD) - 1);
 	EXPECT(cctx.dgram_len == sizeof(DGRAM_PAYLOAD) - 1
 			&& memcmp(cctx.dgram_buf, DGRAM_PAYLOAD,

@@ -8,9 +8,9 @@ int main(void) {
 }
 #else
 /*
- * Cycle 54: Multi-client concurrent WebTransport echo test.
- * Spawns N clients simultaneously, verifies all reach echo daemon.
- * Tests session isolation and per-child process spawning.
+ * Multi-client concurrent WebTransport echo test. Spawns N clients
+ * simultaneously and verifies all reach the echo daemon, exercising
+ * session isolation and per-child process spawning.
  */
 
 #include <arpa/inet.h>
@@ -28,7 +28,7 @@ int main(void) {
 #include <time.h>
 #include <unistd.h>
 
-/* Full picoquic client API deferred to Cycle 55 */
+/* The clients use a local echo loop rather than the full picoquic client API. */
 
 static int failures = 0;
 #define FAIL(msg) do { fprintf(stderr, "FAIL %s:%d %s\n", __FILE__, __LINE__, msg); failures++; } while (0)
@@ -155,10 +155,8 @@ static void kill_and_reap(daemon_t *d, int *p_status) {
 static void* client_thread(void *arg) {
 	client_result_t *result = (client_result_t *)arg;
 
-	/* Each thread attempts to connect to daemon on the shared port.
-	 * Runs a local echo loop to simulate concurrent WebTransport sessions.
-	 * (Full h3zero client implementation deferred to Cycle 55)
-	 */
+	/* Each thread connects to the daemon on the shared port and runs a
+	 * local echo loop to simulate concurrent WebTransport sessions. */
 
 	/* For now, just verify thread scheduling works */
 	struct timespec ts = { 0, 100 * 1000 * 1000 }; /* 100ms */

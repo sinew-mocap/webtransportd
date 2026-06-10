@@ -1,10 +1,9 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
-/* TDD log:
- * - Cycle 16 (this file): wtd_child_spawn forks/exec's a child program
- *   with three pipes (stdin/stdout/stderr). We use /bin/cat as the
- *   child: bytes we write to stdin_fd come back unchanged on stdout_fd.
- *   wtd_child_terminate then SIGTERMs and reaps cleanly.
+/* wtd_child_spawn forks/execs a child program with three pipes
+ * (stdin/stdout/stderr). The test uses /bin/cat as the child: bytes
+ * written to stdin_fd come back unchanged on stdout_fd, and
+ * wtd_child_terminate then SIGTERMs and reaps it cleanly.
  */
 
 #include "child_process.h"
@@ -67,10 +66,10 @@ static void cycle16_cat_echo(void) {
 
 int main(void) {
 #ifdef _WIN32
-	/* /bin/cat is POSIX-only. The Windows CreateProcessA path added
-	 * in cycle 37 is covered indirectly by the handshake tests
-	 * (examples/echo, which builds anywhere). A dedicated Win32
-	 * unit test using a cmd.exe findstr pipe is a future cycle. */
+	/* /bin/cat is POSIX-only. The handshake tests cover the Windows
+	 * CreateProcessA path indirectly (examples/echo builds anywhere);
+	 * a dedicated Win32 unit test using a cmd.exe findstr pipe would
+	 * cover it directly. */
 	return 0;
 #else
 	cycle16_cat_echo();

@@ -1,40 +1,24 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
-/* TDD log:
- * - Cycle 1: encode "hi" reliable, expect [0x00, 0x02, 'h', 'i'].
- * - Cycle 2: decode round-trips the same bytes back to flag + payload.
- * - Cycle 3: decode reports WTD_FRAME_INCOMPLETE for every short prefix of
- *   a valid frame; the full frame flips back to OK.
- * - Cycle 4: only bit 0 of the flag byte is meaningful. Encode rejects
- *   flags with any reserved bit set; decode rejects on-wire frames whose
- *   flag has any reserved bit set.
- * - Cycle 5: payload >= 64 bytes pushes the length past the 1-byte varint
- *   range. Round-trip must still work, the on-wire length prefix must be
- *   the 2-byte form (top two bits = 0b01), and `consumed` must account for
- *   the extra varint byte.
- * - Cycle 6: close the latent OOB-read door from cycle 5. ASAN-fenced
- *   exact-sized prefixes confirm decode never reads past the buffer.
- * - Cycle 7: payload >= 16384 bytes pushes the length past the 2-byte
- *   varint range. Round-trip must still work, the on-wire length prefix
- *   must be the 4-byte form (top two bits = 0b10), and the ASAN-fenced
- *   incomplete-prefix coverage extends to this size.
- * - Cycle 8: two frames packed back-to-back in the same buffer must each
- *   decode independently. `consumed` must report the exact length of the
- *   just-decoded frame (not the buffer), so the caller can advance and
- *   decode the next one.
- * - Cycle 9: payload past WTD_FRAME_MAX_PAYLOAD is rejected on encode,
- *   and decode refuses an on-wire frame whose length-varint claims more
- *   than the cap (defends against an attacker-crafted stream that would
- *   otherwise force a huge alloc on the daemon's reader thread).
- * - Cycle 10: encode refuses if the caller's output
- *   buffer is smaller than the encoded frame would be — and does so
- *   *without* writing a single byte to that buffer (ASAN-fenced).
- * - Cycle 25: decoder accepts the QUIC-style 8-byte varint form
- *   (prefix 0b11). Our encoder always picks the shortest form so it
- *   never emits prefix-3, but peers might. Two cases: a valid
- *   8-byte varint with a small value decodes the frame cleanly; an
- *   8-byte varint whose value exceeds WTD_FRAME_MAX_PAYLOAD is
- *   rejected with ERR_TOO_BIG without reading past the buffer.
+/* frame_test verifies the length-prefixed codec end to end:
+ *   - encode tags a reliable payload as [flag, varint len, payload], and
+ *     decode round-trips the same bytes back to flag + payload.
+ *   - decode reports WTD_FRAME_INCOMPLETE for every short prefix of a
+ *     valid frame and flips to OK once the whole frame is present.
+ *   - only bit 0 of the flag is meaningful: encode and decode both reject
+ *     any reserved bit.
+ *   - payloads spanning the 2-byte (>= 64), 4-byte (>= 16384), and 8-byte
+ *     varint length forms round-trip, with the on-wire prefix in the
+ *     expected form and `consumed` reporting the exact frame length, so
+ *     frames packed back-to-back decode independently.
+ *   - payloads past WTD_FRAME_MAX_PAYLOAD are rejected on encode and on
+ *     decode, bounding the daemon reader thread's allocation against an
+ *     attacker-crafted length.
+ *   - encode refuses an undersized output buffer without writing a byte.
+ *   - decode accepts a peer's QUIC-style 8-byte varint (prefix 0b11),
+ *     which the encoder never emits: a small value decodes cleanly, and a
+ *     value past the cap is rejected with ERR_TOO_BIG.
+ * ASAN fences the incomplete-prefix and oversized cases against OOB reads.
  */
 
 #include "frame.h"
@@ -387,11 +371,11 @@ static void cycle25_eight_byte_varint(void) {
 }
 
 static void cycle41_eight_byte_varint_encode(void) {
-	/* Cycle 41: the encoder now emits the 8-byte (prefix-3) form for
-	 * values >= 2^30 — up to 2^62 - 1, the QUIC varint limit. Test
-	 * the encoder directly via wtd_frame_encode_varint so we don't
-	 * need a 1 GiB payload buffer; frame_fuzz_test exercises the
-	 * shorter-form paths on random inputs elsewhere. */
+	/* The encoder emits the 8-byte (prefix-3) form for values >= 2^30,
+	 * up to 2^62 - 1, the QUIC varint limit. This drives the encoder
+	 * directly via wtd_frame_encode_varint to avoid a 1 GiB payload
+	 * buffer; frame_fuzz_test exercises the shorter-form paths on random
+	 * inputs. */
 	uint8_t out[8];
 
 	/* 1<<30: smallest value that trips prefix 3. */

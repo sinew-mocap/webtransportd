@@ -30,10 +30,10 @@ size_t wtd_frame_encode_varint(uint64_t v, uint8_t *out) {
 		return 4;
 	}
 	if (v < (1ull << 62)) {
-		/* 8-byte form: 62-bit value, prefix 0b11. Mirrors the decoder
-		 * branch added in cycle 25. Never fires in production today
-		 * (WTD_FRAME_MAX_PAYLOAD < 2^30) but covers interop with a
-		 * peer that happens to emit a prefix-3 length. */
+		/* 8-byte form: 62-bit value, prefix 0b11. Mirrors the decoder's
+		 * prefix-3 branch. Production payloads stay below 2^30
+		 * (WTD_FRAME_MAX_PAYLOAD), so this form stays idle locally but
+		 * accepts a peer that emits a prefix-3 length. */
 		out[0] = (uint8_t)(0xc0 | (v >> 56));
 		out[1] = (uint8_t)((v >> 48) & 0xff);
 		out[2] = (uint8_t)((v >> 40) & 0xff);

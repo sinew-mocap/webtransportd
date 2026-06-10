@@ -11,10 +11,10 @@
  *   * best-effort graceful exit (SIGTERM / TerminateProcess) with
  *     a short grace period, then forced kill / reap
  *
- * The POSIX path is the original cycle-16 code. The Win32 path
- * (cycle 37) uses CreateProcessA + CreatePipe and wraps the pipe
- * HANDLEs as CRT fds via _open_osfhandle, so the daemon's existing
- * read/write/close calls work unchanged on both platforms.
+ * The POSIX path uses fork + execvp + pipe. The Win32 path uses
+ * CreateProcessA + CreatePipe and wraps the pipe HANDLEs as CRT fds via
+ * _open_osfhandle, so the daemon's existing read/write/close calls work
+ * unchanged on both platforms.
  */
 
 #include "child_process.h"
@@ -52,9 +52,9 @@ int wtd_child_spawn(const char *const *argv, const char *const *envp,
 	if (argv == NULL || argv[0] == NULL) {
 		return -EINVAL;
 	}
-	/* envp override is a nice-to-have; on Win32 we inherit the
-	 * parent environment for now. A future cycle can plumb a
-	 * UTF-16 environment block through CreateProcessW. */
+	/* envp override is a nice-to-have; on Win32 the child inherits the
+	 * parent environment. Plumbing a UTF-16 environment block through
+	 * CreateProcessW would honor envp here. */
 	(void)envp;
 
 	SECURITY_ATTRIBUTES sa = { 0 };
@@ -269,8 +269,8 @@ int wtd_child_spawn(const char *const *argv, const char *const *envp,
 	set_cloexec(in_pipe[1]);
 	set_cloexec(out_pipe[0]);
 	set_cloexec(err_pipe[0]);
-	/* Cycle 45: set non-blocking on parent stdin writer so
-	 * server_stream_cb never blocks waiting for a slow child. */
+	/* The parent's stdin writer is non-blocking, so the network thread
+	 * never blocks waiting for a slow child. */
 	{
 		int _fl = fcntl(in_pipe[1], F_GETFL);
 		if (_fl >= 0)

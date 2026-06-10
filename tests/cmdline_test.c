@@ -1,13 +1,10 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
-/* TDD log:
- * - Cycle 40b (this file): wtd_build_cmdline must emit an MSDN-
- *   compliant quoted-argv string so CommandLineToArgvW parses it
- *   back to the same argv[] byte-for-byte. The previous
- *   build_cmdline in child_process.c only wrapped args that
- *   contained spaces and did no escaping of embedded quotes or
- *   backslash runs — unsafe for any arg that contains `"` or
- *   trails with `\`. UTF-8 bytes pass through unchanged.
+/* wtd_build_cmdline emits an MSDN-compliant quoted-argv string so
+ * CommandLineToArgvW parses it back to the same argv[] byte-for-byte: it
+ * quotes args, escapes embedded quotes and backslash runs (so an arg
+ * containing `"` or trailing `\` survives), and passes UTF-8 bytes
+ * through unchanged.
  */
 
 #include "cmdline.h"
@@ -118,9 +115,8 @@ static void cycle40b_utf8_passthrough(void) {
 	/* UTF-8 bytes are not special in Windows command-line encoding
 	 * — they pass through byte-for-byte as long as no whitespace
 	 * or quote is present in the arg. The daemon's manifest pins
-	 * the active code page to UTF-8 (cycle 40a), so
-	 * CommandLineToArgvW on the receiving side decodes them back
-	 * as UTF-8. */
+	 * the active code page to UTF-8, so CommandLineToArgvW on the
+	 * receiving side decodes them back as UTF-8. */
 	const char *argv[] = { "文档/bin/echo", NULL };
 	char buf[64];
 	if (wtd_build_cmdline(argv, buf, sizeof(buf)) != 0) {
