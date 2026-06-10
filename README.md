@@ -1,11 +1,15 @@
 # webtransportd
 
-A WebTransport/QUIC daemon that exec's a child process per session and pipes bytes between the WebTransport stream/datagram channel and the child's stdin/stdout. Like [websocketd](https://github.com/joewalnes/websocketd), but for WebTransport. Any programming language that can read stdin and write stdout can serve a WebTransport session without linking a QUIC library.
+webtransportd lets a web browser exchange real-time data with a program you write — in any language — without that program needing to know anything about networking.
+
+You write a normal little program that reads standard input and writes standard output. webtransportd does the hard part: it speaks the browser's WebTransport protocol (QUIC, TLS, and HTTP/3), and for each browser that connects it launches your program and pipes bytes both ways — what the browser sends arrives on your program's stdin, and whatever your program prints goes back to the browser.
+
+It's like [websocketd](https://github.com/joewalnes/websocketd), but for the newer WebTransport — so you also get WebTransport's two delivery modes: reliable streams and unreliable datagrams.
 
 ## Quickstart
 
 ```bash
-git clone https://github.com/fire/webtransportd
+git clone https://github.com/sinew-mocap/webtransportd
 cd webtransportd
 make
 ./webtransportd --server --cert=auto --port=4433 \
