@@ -215,12 +215,6 @@ Services that do **not** work (TCP only, QUIC is dropped):
 
 For local development across machines, Tailscale's mesh (node-to-node, not Funnel) works because the mesh itself supports UDP.
 
-## Relationship to Godot
-
-The vendored libraries in `thirdparty/` (picoquic, picotls, mbedtls) are **snapshots** pulled from Godot's tree to ensure compatibility. The daemon requires no Godot toolchain and runs standalone on any POSIX system or Windows.
-
-If you are using WebTransport inside the Godot engine, see [Godot's `modules/http3/`](https://github.com/godotengine/godot/tree/master/modules/http3) for the same stack integrated into the editor and runtime.
-
 ## License and Contact
 
 This project is licensed under the BSD-2-Clause license. See [`LICENSE`](LICENSE) for details.
