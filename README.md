@@ -9,7 +9,7 @@ It's like [websocketd](https://github.com/joewalnes/websocketd), but for the new
 ## Quickstart
 
 ```bash
-git clone https://github.com/sinew-mocap/webtransportd
+git clone https://github.com/fire/webtransportd
 cd webtransportd
 make
 ./webtransportd --server --cert=auto --port=4433 \
