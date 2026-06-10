@@ -2,19 +2,20 @@
 
 ## Code Organization
 
-The daemon is laid out as a ports-and-adapters hexagon:
+The daemon is laid out as a ports-and-adapters hexagon, matching the
+sinew-mocap cluster convention (top-level `core/` + `ports/` +
+`adapters/`). Headers sit beside their `.c` and are included by bare name.
 
-| Directory             | Purpose                                                        |
-|-----------------------|---------------------------------------------------------------|
-| `src/app/`            | Composition root: CLI parsing and wiring (`main.c`, `cmdline.c`) |
-| `src/domain/`         | Hexagon core: session policy, frame codec, work queue — no QUIC/OS dependencies |
-| `src/adapters/`       | Driven/driving edges: picoquic transport, child process, child-output reader, autocert, logging |
-| `src/include/`        | Headers (`.h`)                                                |
-| `src/include/ports/`  | Port interfaces (header-only)                                 |
-| `tests/unit/`         | Unit tests                                                    |
-| `examples/`           | Example child programs                                        |
-| `docs/`               | Documentation                                                 |
-| `scripts/`            | Build/test scripts                                            |
+| Directory      | Purpose                                                        |
+|----------------|----------------------------------------------------------------|
+| `core/`        | Hexagon core: session policy, frame codec, work queue — no QUIC/OS dependencies |
+| `ports/`       | Port interfaces (header-only)                                  |
+| `adapters/`    | Driven/driving edges and composition root: picoquic transport, child process, child-output reader, autocert, logging, CLI, `main.c` |
+| `tests/`       | Unit, property, and end-to-end tests                          |
+| `examples/`    | Example child programs                                        |
+| `prototypes/`  | Standalone HTTP/3 experiments (not built by default)          |
+| `docs/`        | Documentation                                                 |
+| `scripts/`     | Build/test scripts                                            |
 
 ## Building
 
