@@ -103,3 +103,39 @@ int wtd_build_cmdline(const char *const *argv, char *out, size_t cap) {
 
 #undef PUT
 }
+
+size_t wtd_split_cmdline(char *cmd, const char **argv, size_t argv_cap) {
+	if (cmd == NULL || argv == NULL || argv_cap == 0) {
+		return 0;
+	}
+	size_t argc = 0;
+	char *p = cmd;
+	while (argc + 1 < argv_cap) { /* leave a slot for the NULL terminator */
+		while (*p == ' ' || *p == '\t') {
+			p++;
+		}
+		if (*p == '\0') {
+			break;
+		}
+		char *start;
+		if (*p == '"') {
+			p++;
+			start = p;
+			while (*p != '\0' && *p != '"') {
+				p++;
+			}
+		} else {
+			start = p;
+			while (*p != '\0' && *p != ' ' && *p != '\t') {
+				p++;
+			}
+		}
+		if (*p != '\0') {
+			*p = '\0';
+			p++;
+		}
+		argv[argc++] = start;
+	}
+	argv[argc] = NULL;
+	return argc;
+}
