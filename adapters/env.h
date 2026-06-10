@@ -5,7 +5,7 @@
  *
  * Build the environment block for a child process: WEBTRANSPORT_*
  * CGI-style variables describing the peer + path, plus any host env vars
- * whitelisted by --passenv (added in a later cycle).
+ * whitelisted by --passenv.
  */
 
 #ifndef WEBTRANSPORTD_ENV_H

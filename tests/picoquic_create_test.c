@@ -1,12 +1,11 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
-/* TDD log:
- * - Cycle 21c: vendored picoquic + picohttp + picotls + mbedtls all
- *   compile and link together. picoquic_create(...) with a zero reset
- *   seed, no cert/key, no ticket file, and every other pointer NULL
- *   must return a non-NULL picoquic_quic_t (i.e. the TLS subsystem
- *   wired through picoquic_mbedtls initialises without crashing).
- *   picoquic_free must then tear it down without ASAN complaints.
+/* picoquic_create_test confirms the vendored picoquic + picohttp +
+ * picotls + mbedtls stack compiles and links together. picoquic_create(...)
+ * with a zero reset seed, no cert/key, no ticket file, and every other
+ * pointer NULL returns a non-NULL picoquic_quic_t — the TLS subsystem
+ * wired through picoquic_mbedtls initialises without crashing — and
+ * picoquic_free tears it down without ASAN complaints.
  */
 
 #include "picoquic.h"

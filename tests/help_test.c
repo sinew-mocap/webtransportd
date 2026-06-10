@@ -1,27 +1,21 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
 #ifdef _WIN32
-/* POSIX-only test (fork+exec / sys/wait / arpa/inet). Cross-
- * compilation on mingw would need CreateProcess + Winsock
- * ports of the harness. Until that cycle lands, skip on
- * Windows so the build is green. The test body is still
- * compiled and run on linux-gcc + macos-clang. */
+/* POSIX-only test (fork+exec / sys/wait / arpa/inet). On Windows it
+ * skips: the harness needs CreateProcess + Winsock ports. The body
+ * still compiles and runs on linux-gcc + macos-clang. */
 #include <stdio.h>
 int main(void) {
     fprintf(stderr, "SKIP: POSIX-only test on Windows\n");
     return 0;
 }
 #else
-/* TDD log:
- * - Cycle 30 (this file): `./webtransportd --help` prints an
- *   operator-friendly summary to stdout and exits 0. Beyond the
- *   bare "usage:" line, it must include a one-line description of
- *   what the daemon does, a line per subcommand, a line per
- *   server-mode option, and a note about the framing on the
- *   child's pipes. We assert a handful of distinctive substrings
- *   so the test fails loudly if any section is accidentally
- *   deleted but doesn't need updating every time the prose is
- *   rewritten.
+/* `./webtransportd --help` prints an operator-friendly summary to stdout
+ * and exits 0. Beyond the bare "usage:" line it carries a one-line
+ * description of the daemon, a line per subcommand, a line per server-mode
+ * option, and a note about the framing on the child's pipes. The test
+ * asserts a handful of distinctive substrings, so it fails loudly if a
+ * section is deleted but tolerates prose rewrites.
  */
 
 #include <errno.h>

@@ -3,8 +3,9 @@
 /*
  * webtransportd — env.c
  *
- * Minimum implementation: emit only WEBTRANSPORT_REMOTE_ADDR for now.
- * The next cycle's RED test will demand WEBTRANSPORT_PATH, etc.
+ * Builds the child's environment block: the WEBTRANSPORT_* CGI-style
+ * variables describing the peer and path, plus any host vars named in
+ * --passenv.
  */
 
 #include "env.h"

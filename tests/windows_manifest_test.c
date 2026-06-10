@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
-/* Cycle 40a: verify that webtransportd's Windows build has the
- * UTF-8 activeCodePage manifest embedded. `GetACP()` returns the
+/* Verifies that webtransportd's Windows build has the UTF-8
+ * activeCodePage manifest embedded. `GetACP()` returns the
  * process's active ANSI code page; with our manifest it reports
  * 65001 (CP_UTF8), which is what makes CreateProcessA, main()'s
  * argv, getenv, and fopen treat their byte strings as UTF-8 on

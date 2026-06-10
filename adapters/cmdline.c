@@ -25,8 +25,8 @@
  * We only read bytes, not code points, so UTF-8 multi-byte
  * sequences that don't collide with ASCII specials (` `, `\t`,
  * `"`, `\`) pass through unchanged. The activeCodePage=UTF-8
- * manifest on the receiving side (cycle 40a) makes that a
- * byte-for-byte round-trip.
+ * manifest on the receiving side makes that a byte-for-byte
+ * round-trip.
  */
 int wtd_build_cmdline(const char *const *argv, char *out, size_t cap) {
 	if (argv == NULL || out == NULL) {

@@ -1,14 +1,10 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
-/* TDD log:
- * - Cycle 13: env_build returns a NULL-terminated envp[] containing
- *   WEBTRANSPORT_REMOTE_ADDR.
- * - Cycle 14: the full CGI-style set — REMOTE_ADDR, REMOTE_PORT, PATH,
- *   AUTHORITY, VERSION — must all be present.
- * - Cycle 15 (this addition): a comma-separated --passenv whitelist
- *   forwards selected host env vars. Vars not in the whitelist are
- *   omitted; vars in the whitelist that aren't set on the host are
- *   silently skipped.
+/* wtd_env_build returns a NULL-terminated envp[] carrying the full
+ * CGI-style set — WEBTRANSPORT_REMOTE_ADDR, REMOTE_PORT, PATH, AUTHORITY,
+ * VERSION — and forwards host env vars named in a comma-separated
+ * --passenv whitelist. Vars outside the whitelist are omitted; whitelisted
+ * vars not set on the host are skipped.
  */
 
 #include "env.h"

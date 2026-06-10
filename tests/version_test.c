@@ -1,30 +1,22 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
 #ifdef _WIN32
-/* POSIX-only test (fork+exec / sys/wait / arpa/inet). Cross-
- * compilation on mingw would need CreateProcess + Winsock
- * ports of the harness. Until that cycle lands, skip on
- * Windows so the build is green. The test body is still
- * compiled and run on linux-gcc + macos-clang. */
+/* POSIX-only test (fork+exec / sys/wait / arpa/inet). On Windows it
+ * skips: the harness needs CreateProcess + Winsock ports. The body
+ * still compiles and runs on linux-gcc + macos-clang. */
 #include <stdio.h>
 int main(void) {
     fprintf(stderr, "SKIP: POSIX-only test on Windows\n");
     return 0;
 }
 #else
-/* TDD log:
- * - Cycle 19-20 (this file): smoke test for the webtransportd binary.
- *   fork+exec ./webtransportd --version with stdout captured through a
- *   pipe. Assertions:
- *     * child exits 0 normally
- *     * stdout is non-empty
- *     * stdout contains WTD_VERSION (so the test breaks when the
- *       daemon forgets to print the version constant it was compiled
- *       with, not just anything non-empty)
- *
- *   The test links no module code — it shells the daemon. A Makefile
- *   prerequisite forces ./webtransportd to be built before this test
- *   is run.
+/* version_test is a smoke test for the webtransportd binary. It fork+execs
+ * ./webtransportd --version with stdout captured through a pipe, and
+ * asserts the child exits 0, stdout is non-empty, and stdout contains
+ * WTD_VERSION — so it breaks when the daemon prints something other than
+ * the version constant it was compiled with. The test links no module
+ * code; it shells the daemon, and a build dependency forces ./webtransportd
+ * to exist first.
  */
 
 #include "version.h"

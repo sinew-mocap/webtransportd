@@ -1,28 +1,20 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
 #ifdef _WIN32
-/* POSIX-only test (fork+exec / sys/wait / arpa/inet). Cross-
- * compilation on mingw would need CreateProcess + Winsock
- * ports of the harness. Until that cycle lands, skip on
- * Windows so the build is green. The test body is still
- * compiled and run on linux-gcc + macos-clang. */
+/* POSIX-only test (fork+exec / sys/wait / arpa/inet). On Windows it
+ * skips: the harness needs CreateProcess + Winsock ports. The body
+ * still compiles and runs on linux-gcc + macos-clang. */
 #include <stdio.h>
 int main(void) {
     fprintf(stderr, "SKIP: POSIX-only test on Windows\n");
     return 0;
 }
 #else
-/* TDD log:
- * - Cycle 21d.1 (this file): smoke test for the daemon's --selftest
- *   path. fork+exec ./webtransportd --selftest; the child must
- *   exit(0) with stdout containing "selftest ok". Proves the
- *   picoquic packet-loop thread can start (bind an OS-picked UDP
- *   port, become ready) and stop cleanly under ASAN+UBSAN from the
- *   daemon main().
- *
- *   Cycle 21d.2+ builds on this with an in-process client/server
- *   handshake, and 21d.3 drives a client against the running daemon
- *   over real loopback UDP.
+/* selftest_test is a smoke test for the daemon's --selftest path. It
+ * fork+execs ./webtransportd --selftest; the child exits(0) with stdout
+ * containing "selftest ok", proving the picoquic packet-loop thread starts
+ * (binds an OS-picked UDP port, becomes ready) and stops cleanly under
+ * ASAN+UBSAN from the daemon main().
  */
 
 #include <errno.h>

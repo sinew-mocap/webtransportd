@@ -1,28 +1,21 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Copyright (c) 2026, K. S. Ernest (iFire) Lee */
 #ifdef _WIN32
-/* POSIX-only test (fork+exec / sys/wait / arpa/inet). Cross-
- * compilation on mingw would need CreateProcess + Winsock
- * ports of the harness. Until that cycle lands, skip on
- * Windows so the build is green. The test body is still
- * compiled and run on linux-gcc + macos-clang. */
+/* POSIX-only test (fork+exec / sys/wait / arpa/inet). On Windows it
+ * skips: the harness needs CreateProcess + Winsock ports. The body
+ * still compiles and runs on linux-gcc + macos-clang. */
 #include <stdio.h>
 int main(void) {
     fprintf(stderr, "SKIP: POSIX-only test on Windows\n");
     return 0;
 }
 #else
-/* TDD log:
- * - Cycle 12: the log module emits a line on stderr when the message
- *   level is <= the configured filter level, and stays silent
- *   otherwise. We capture stderr to a temp file to verify both
- *   behaviours without mocking the FILE*.
- *
- * - Cycle 28: each emitted line is prefixed with its level tag —
- *   `[ERROR] `, `[WARN] `, `[INFO] `, `[TRACE] `. This lets a human
- *   reading the daemon's stderr distinguish routine INFO traffic
- *   (like forwarded child stderr) from genuine daemon errors,
- *   without having to track which lines came from which code path.
+/* The log module emits a line on stderr when the message level is <= the
+ * configured filter level and stays silent otherwise; the test captures
+ * stderr to a temp file to verify both behaviours without mocking FILE*.
+ * Each emitted line carries its level tag — `[ERROR] `, `[WARN] `,
+ * `[INFO] `, `[TRACE] ` — so a human reading the daemon's stderr can tell
+ * routine INFO traffic (like forwarded child stderr) from daemon errors.
  */
 
 #include "log.h"

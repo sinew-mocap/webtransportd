@@ -3,11 +3,10 @@
 /*
  * webtransportd — log.c
  *
- * Minimum log module driven by log_test.c. Deliberately lean: no
- * timestamps, no rate-limiting, no file rotation. Cycle 28 added the
- * `[LEVEL] ` prefix so a human reading the daemon's stderr can pick
- * out genuine errors from routine INFO traffic (like forwarded child
- * stderr lines).
+ * A lean log module: no timestamps, no rate-limiting, no file rotation.
+ * Each line carries a `[LEVEL] ` prefix so a human reading the daemon's
+ * stderr can pick out genuine errors from routine INFO traffic (like
+ * forwarded child stderr lines).
  */
 
 #include "log.h"
