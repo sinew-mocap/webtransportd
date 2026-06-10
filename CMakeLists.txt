@@ -216,6 +216,11 @@ target_include_directories(echo PRIVATE ${OUR_INCLUDES})
 set_target_properties(echo PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/examples")
 
+add_executable(shout examples/shout.c core/frame.c)
+target_include_directories(shout PRIVATE ${OUR_INCLUDES})
+set_target_properties(shout PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/examples")
+
 add_executable(frame_hi examples/frame_hi.c)
 target_include_directories(frame_hi PRIVATE ${OUR_INCLUDES})
 set_target_properties(frame_hi PROPERTIES

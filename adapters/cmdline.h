@@ -34,6 +34,16 @@ extern "C" {
 
 int wtd_build_cmdline(const char *const *argv, char *out, size_t cap);
 
+/* Split a command string into argv tokens in place. Tokens are separated
+ * by spaces/tabs; a double-quoted run is one token with its quotes
+ * stripped and inner whitespace kept (so `py "a b.py"` is two tokens:
+ * `py` and `a b.py`). `cmd` is mutated (NULs written at token ends); the
+ * `argv` entries point into it. Fills at most `argv_cap - 1` tokens, then
+ * NUL-terminates `argv`. Returns the token count (argc). This is what
+ * lets `--exec="python3 ./examples/echo.py"` spawn python3 with its
+ * script argument rather than treating the whole string as one filename. */
+size_t wtd_split_cmdline(char *cmd, const char **argv, size_t argv_cap);
+
 #ifdef __cplusplus
 }
 #endif

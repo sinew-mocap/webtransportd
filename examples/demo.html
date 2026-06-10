@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: BSD-2-Clause -->
+<!-- Copyright (c) 2026, K. S. Ernest (iFire) Lee -->
+<!--
+  examples/demo.html — a WebTransport "shout box" for webtransportd.
+
+  Type a message; it is sent to the daemon as an UNRELIABLE DATAGRAM, the
+  child process shouts it back (uppercase), and the reply arrives as a
+  datagram. Datagrams are the thing WebSockets can't do — each one is a
+  self-contained message with no head-of-line blocking.
+
+  Run the daemon with the uppercase child:
+    ./webtransportd --server --cert=auto --port=4433 \
+        --exec="python3 ./examples/uppercase.py"
+  Copy the `cert-hash:` it prints on startup, serve this page from a
+  localhost origin, open it in Firefox, paste the hash, and connect.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>webtransportd · datagram shout box</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #121922;
+    --line: #1f2b38;
+    --ink: #d7e3ee;
+    --dim: #6b7d90;
+    --you: #4fd6be;
+    --srv: #ffb454;
+    --accent: #4fd6be;
+    --bad: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background:
+      radial-gradient(1200px 600px at 80% -10%, #16313050, transparent),
+      radial-gradient(900px 500px at -10% 110%, #2a1f3a40, transparent),
+      var(--bg);
+    color: var(--ink);
+    font: 15px/1.5 ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .app { width: min(720px, 100%); }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+  header h1 b { color: var(--accent); }
+  header .sub { color: var(--dim); font-size: 13px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+  .conn { padding: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .conn input {
+    flex: 1 1 320px; min-width: 0; background: #0c1219; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px;
+    font: inherit; font-size: 13px;
+  }
+  .conn input::placeholder { color: #46566880; }
+  button {
+    background: var(--accent); color: #06231e; border: 0; border-radius: 9px;
+    padding: 10px 16px; font: inherit; font-weight: 700; cursor: pointer;
+    transition: filter .15s ease, opacity .15s;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--dim); border: 1px solid var(--line); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim);
+         box-shadow: 0 0 0 0 transparent; transition: all .2s; flex: 0 0 auto; }
+  .dot.on  { background: var(--accent); box-shadow: 0 0 12px 1px var(--accent); }
+  .dot.bad { background: var(--bad); box-shadow: 0 0 12px 1px var(--bad); }
+  .status { color: var(--dim); font-size: 13px; }
+  .log {
+    margin-top: 14px; padding: 14px; height: 340px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .row { display: flex; gap: 10px; align-items: baseline; }
+  .row .tag { flex: 0 0 56px; text-align: right; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .6px; }
+  .row .msg { flex: 1; word-break: break-word; }
+  .row.you .msg { color: var(--you); }
+  .row.srv .msg { color: var(--srv); }
+  .row.sys .msg { color: var(--dim); font-style: italic; }
+  .row .rtt { color: var(--dim); font-size: 11px; flex: 0 0 auto; }
+  .send { margin-top: 14px; display: flex; gap: 10px; }
+  .send input {
+    flex: 1; background: #0c1219; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 11px; padding: 12px 14px; font: inherit;
+  }
+  .send input:focus, .conn input:focus { outline: none; border-color: var(--accent); }
+  .hint { margin-top: 12px; color: var(--dim); font-size: 12px; }
+  .hint code { color: #9fb3c8; }
+  .empty { color: #3c4a5a; text-align: center; margin: auto; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>web<b>transport</b>d</h1>
+    <span class="sub">datagram shout box</span>
+  </header>
+
+  <div class="card">
+    <div class="conn">
+      <span id="dot" class="dot"></span>
+      <input id="hash" placeholder="paste the cert-hash printed by the server…" autocomplete="off" spellcheck="false" />
+      <button id="connect">Connect</button>
+      <span id="status" class="status">offline</span>
+    </div>
+  </div>
+
+  <div class="card log" id="log">
+    <div class="empty" id="empty">connect, then say something →</div>
+  </div>
+
+  <div class="send">
+    <input id="msg" placeholder="type a message and hit Enter" autocomplete="off" disabled />
+    <button id="say" disabled>Shout</button>
+  </div>
+
+  <p class="hint">
+    Each message rides an unreliable <code>WebTransport</code> datagram to
+    <code>https://localhost:4433/wt</code>; the server shouts it back the same way.
+    Works in Firefox &amp; Chrome.
+  </p>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const log = $('log'), empty = $('empty'), dot = $('dot'), statusEl = $('status');
+  const enc = new TextEncoder(), dec = new TextDecoder();
+
+  let wt = null, writer = null, pending = [];
+
+  function setStatus(text, cls) {
+    statusEl.textContent = text;
+    dot.className = 'dot' + (cls ? ' ' + cls : '');
+  }
+  function add(kind, msg, rtt) {
+    if (empty) { empty.remove(); }
+    const row = document.createElement('div');
+    row.className = 'row ' + kind;
+    const tag = kind === 'you' ? 'you' : kind === 'srv' ? 'server' : '·';
+    row.innerHTML = `<span class="tag">${tag}</span><span class="msg"></span>` +
+      (rtt != null ? `<span class="rtt">${rtt.toFixed(1)} ms</span>` : '');
+    row.querySelector('.msg').textContent = msg;
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function connect() {
+    const b64 = $('hash').value.trim();
+    if (!b64) { add('sys', 'paste the cert-hash first'); return; }
+    let hashBytes;
+    try { hashBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); }
+    catch { add('sys', 'that does not look like a base64 cert-hash'); return; }
+
+    setStatus('connecting…');
+    try {
+      wt = new WebTransport('https://localhost:4433/wt', {
+        serverCertificateHashes: [{ algorithm: 'sha-256', value: hashBytes }],
+      });
+      await wt.ready;
+    } catch (e) {
+      setStatus('failed', 'bad');
+      add('sys', 'connection failed: ' + e.message);
+      return;
+    }
+    setStatus('connected', 'on');
+    add('sys', 'connected — datagram channel open');
+    $('msg').disabled = false; $('say').disabled = false; $('msg').focus();
+    $('connect').textContent = 'Reconnect';
+
+    pending = [];               // fresh round-trip pairing for this session
+    writer = wt.datagrams.writable.getWriter();
+    readLoop();
+    wt.closed.then(() => setStatus('closed')).catch(() => setStatus('lost', 'bad'))
+      .finally(() => { $('msg').disabled = true; $('say').disabled = true; });
+  }
+
+  async function readLoop() {
+    const reader = wt.datagrams.readable.getReader();
+    for (;;) {
+      let chunk;
+      try { chunk = await reader.read(); } catch { break; }
+      if (chunk.done) break;
+      const t0 = pending.shift();
+      const rtt = t0 != null ? performance.now() - t0 : null;
+      add('srv', dec.decode(chunk.value), rtt);
+    }
+  }
+
+  async function say() {
+    const input = $('msg'); const text = input.value;
+    if (!text || !writer) return;
+    add('you', text);
+    pending.push(performance.now());
+    try { await writer.write(enc.encode(text)); }
+    catch (e) { add('sys', 'send failed: ' + e.message); }
+    input.value = '';
+  }
+
+  $('connect').addEventListener('click', connect);
+  $('say').addEventListener('click', say);
+  $('msg').addEventListener('keydown', (e) => { if (e.key === 'Enter') say(); });
+  $('hash').addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(); });
+</script>
+</body>
+</html>

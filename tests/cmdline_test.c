@@ -14,6 +14,7 @@
 
 static int failures = 0;
 #define FAIL(msg) do { fprintf(stderr, "FAIL %s:%d %s\n", __FILE__, __LINE__, msg); failures++; } while (0)
+#define EXPECT(cond) do { if (!(cond)) FAIL(#cond); } while (0)
 #define EXPECT_STREQ(actual, expected) do { \
 	if (strcmp((actual), (expected)) != 0) { \
 		fprintf(stderr, "FAIL %s:%d: expected %s, got %s\n", \
@@ -148,6 +149,53 @@ static void cycle40b_empty_argv(void) {
 	EXPECT_STREQ(buf, "");
 }
 
+/* wtd_split_cmdline tokenizes an --exec string into argv. */
+static void split_single(void) {
+	char cmd[] = "./examples/echo";
+	const char *argv[8];
+	size_t n = wtd_split_cmdline(cmd, argv, 8);
+	if (n != 1) { FAIL("split_single argc"); return; }
+	EXPECT_STREQ(argv[0], "./examples/echo");
+	EXPECT(argv[1] == NULL);
+}
+
+static void split_program_and_arg(void) {
+	char cmd[] = "python3 ./examples/echo.py";
+	const char *argv[8];
+	size_t n = wtd_split_cmdline(cmd, argv, 8);
+	if (n != 2) { FAIL("split_two argc"); return; }
+	EXPECT_STREQ(argv[0], "python3");
+	EXPECT_STREQ(argv[1], "./examples/echo.py");
+	EXPECT(argv[2] == NULL);
+}
+
+static void split_quoted_keeps_spaces(void) {
+	char cmd[] = "py \"a b.py\" tail";
+	const char *argv[8];
+	size_t n = wtd_split_cmdline(cmd, argv, 8);
+	if (n != 3) { FAIL("split_quoted argc"); return; }
+	EXPECT_STREQ(argv[0], "py");
+	EXPECT_STREQ(argv[1], "a b.py");
+	EXPECT_STREQ(argv[2], "tail");
+}
+
+static void split_extra_whitespace(void) {
+	char cmd[] = "  a\t b  ";
+	const char *argv[8];
+	size_t n = wtd_split_cmdline(cmd, argv, 8);
+	if (n != 2) { FAIL("split_ws argc"); return; }
+	EXPECT_STREQ(argv[0], "a");
+	EXPECT_STREQ(argv[1], "b");
+}
+
+static void split_empty(void) {
+	char cmd[] = "   ";
+	const char *argv[4];
+	size_t n = wtd_split_cmdline(cmd, argv, 4);
+	EXPECT(n == 0);
+	EXPECT(argv[0] == NULL);
+}
+
 int main(void) {
 	cycle40b_plain_bare();
 	cycle40b_space_wrapped();
@@ -159,5 +207,10 @@ int main(void) {
 	cycle40b_utf8_passthrough();
 	cycle40b_buffer_too_small();
 	cycle40b_empty_argv();
+	split_single();
+	split_program_and_arg();
+	split_quoted_keeps_spaces();
+	split_extra_whitespace();
+	split_empty();
 	return failures == 0 ? 0 : 1;
 }

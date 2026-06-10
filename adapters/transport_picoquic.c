@@ -18,6 +18,7 @@
 #include "autocert.h"
 #include "child_output.h"
 #include "child_process.h"
+#include "cmdline.h"
 #include "log.h"
 #include "session.h"
 
@@ -70,6 +71,16 @@ static const char *picohttp_event_name(picohttp_call_back_event_t event) {
 
 typedef struct server_ctx server_ctx_t;
 
+/* One queued outbound datagram. picoquic hands the daemon a single
+ * datagram buffer per provide_datagram callback, so datagrams the child
+ * emits faster than picoquic drains them wait in this FIFO rather than
+ * overwriting one another. */
+typedef struct wtd_dgram {
+	struct wtd_dgram *next;
+	size_t len;
+	uint8_t data[]; /* flexible array member */
+} wtd_dgram_t;
+
 /* Per-peer transport state. The session core lives inside it but reaches
  * back out only through the two ports wired in peer_create. */
 typedef struct wtd_peer {
@@ -82,12 +93,13 @@ typedef struct wtd_peer {
 	uint64_t data_stream_id;
 	h3zero_callback_ctx_t *h3_ctx;
 	server_ctx_t *sctx;
-	uint8_t *pending_dgram;
-	size_t pending_dgram_len;
+	wtd_dgram_t *dgram_head; /* outbound datagram FIFO (oldest first) */
+	wtd_dgram_t *dgram_tail;
 } wtd_peer_t;
 
 typedef struct server_ctx {
 	const char *exec_path;
+	const char **exec_argv; /* exec_path split into spawn argv (NULL-terminated) */
 	const char *dir_path;
 	wtd_peer_t *peers;
 	picohttp_server_path_item_t *path_items;
@@ -114,16 +126,23 @@ static int peer_send_stream(void *ctx, const uint8_t *data, size_t len) {
 
 static int peer_send_datagram(void *ctx, const uint8_t *data, size_t len) {
 	wtd_peer_t *p = (wtd_peer_t *)ctx;
-	if (p->pending_dgram != NULL) {
-		free(p->pending_dgram);
-	}
-	p->pending_dgram = (uint8_t *)malloc(len);
-	if (p->pending_dgram == NULL) {
-		p->pending_dgram_len = 0;
+	wtd_dgram_t *d = (wtd_dgram_t *)malloc(sizeof(wtd_dgram_t) + len);
+	if (d == NULL) {
 		return -1;
 	}
-	memcpy(p->pending_dgram, data, len);
-	p->pending_dgram_len = len;
+	d->next = NULL;
+	d->len = len;
+	if (len > 0) {
+		memcpy(d->data, data, len);
+	}
+	/* Append to the FIFO so a burst of replies all survive until
+	 * provide_datagram drains them one at a time. */
+	if (p->dgram_tail != NULL) {
+		p->dgram_tail->next = d;
+	} else {
+		p->dgram_head = d;
+	}
+	p->dgram_tail = d;
 	h3zero_set_datagram_ready(p->cnx, p->control_stream_id);
 	wtd_log(WTD_LOG_TRACE, "transport: datagram queued len=%lu",
 			(unsigned long)len);
@@ -188,8 +207,7 @@ static wtd_peer_t *peer_create(server_ctx_t *sctx, picoquic_cnx_t *cnx,
 	p->control_stream_id = UINT64_MAX;
 	p->data_stream_id = UINT64_MAX;
 
-	const char *argv[] = { sctx->exec_path, NULL };
-	if (wtd_child_spawn(argv, NULL, &p->child) != 0) {
+	if (wtd_child_spawn(sctx->exec_argv, NULL, &p->child) != 0) {
 		free(p);
 		return NULL;
 	}
@@ -238,8 +256,10 @@ static void peer_remove(server_ctx_t *sctx, wtd_peer_t *p) {
 	wtd_child_output_stop(&p->output);
 	wtd_session_destroy(&p->session);
 	wtd_child_terminate(&p->child);
-	if (p->pending_dgram != NULL) {
-		free(p->pending_dgram);
+	for (wtd_dgram_t *d = p->dgram_head; d != NULL;) {
+		wtd_dgram_t *next = d->next;
+		free(d);
+		d = next;
 	}
 	free(p);
 }
@@ -322,15 +342,23 @@ static int wt_session_cb(picoquic_cnx_t *cnx, uint8_t *bytes, size_t length,
 		break;
 
 	case picohttp_callback_provide_datagram:
-		if (p != NULL && p->pending_dgram != NULL) {
+		if (p != NULL && p->dgram_head != NULL) {
+			wtd_dgram_t *d = p->dgram_head;
 			uint8_t *buf = h3zero_provide_datagram_buffer(
-					(void *)bytes, p->pending_dgram_len, 0);
+					(void *)bytes, d->len, 0);
 			if (buf != NULL) {
-				memcpy(buf, p->pending_dgram, p->pending_dgram_len);
+				memcpy(buf, d->data, d->len);
 			}
-			free(p->pending_dgram);
-			p->pending_dgram = NULL;
-			p->pending_dgram_len = 0;
+			p->dgram_head = d->next;
+			if (p->dgram_head == NULL) {
+				p->dgram_tail = NULL;
+			}
+			free(d);
+			/* Re-arm so picoquic comes back for the next queued
+			 * datagram instead of stopping at this one. */
+			if (p->dgram_head != NULL) {
+				h3zero_set_datagram_ready(p->cnx, p->control_stream_id);
+			}
 		}
 		break;
 
@@ -399,7 +427,25 @@ int wtd_transport_run(const wtd_transport_config_t *cfg) {
 	server_param.path_table = path_items;
 	server_param.path_table_nb = 1;
 
-	server_ctx_t sctx = { cfg->exec_path, cfg->dir_path, NULL, path_items, NULL };
+	/* Split --exec into a spawn argv so "python3 ./examples/echo.py" runs
+	 * python3 with its script argument. The buffer + argv live on this
+	 * stack frame, which outlives every spawned child. */
+	char exec_buf[1024];
+	const char *exec_argv[64] = { NULL };
+	if (cfg->exec_path != NULL) {
+		snprintf(exec_buf, sizeof(exec_buf), "%s", cfg->exec_path);
+		wtd_split_cmdline(exec_buf, exec_argv,
+				sizeof(exec_argv) / sizeof(exec_argv[0]));
+	}
+
+	server_ctx_t sctx = {
+		.exec_path = cfg->exec_path,
+		.exec_argv = exec_argv,
+		.dir_path = cfg->dir_path,
+		.peers = NULL,
+		.path_items = path_items,
+		.net_thread_ctx = NULL,
+	};
 	path_items[0].path_app_ctx = &sctx;
 
 	int use_autocert = (cfg->cert != NULL && strcmp(cfg->cert, "auto") == 0);
