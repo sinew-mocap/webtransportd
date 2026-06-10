@@ -149,7 +149,7 @@ target_link_libraries(vendored PUBLIC Threads::Threads ${PLATFORM_LIBS})
 # #define).  The shim lives in our tree; compile it with -w alongside the
 # rest of the vendor pile so all vendor tests resolve the symbol.
 if(WIN32)
-    target_sources(vendored PRIVATE src/core/wtd_wincompat.c)
+    target_sources(vendored PRIVATE src/adapters/wtd_wincompat.c)
     target_include_directories(vendored SYSTEM PRIVATE ${VENDOR_INCLUDES})
 endif()
 
@@ -173,16 +173,24 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
-# Our source files
+# Our source files — organized as a ports-and-adapters hexagon:
+#   app      — composition root (CLI + wiring)
+#   domain   — the hexagon core (pure session policy + codec, no QUIC/OS)
+#   adapters — driven/driving edges (picoquic transport, child process &
+#              output reader, autocert, logging)
+# Port interfaces are header-only under src/include/ports.
 # ---------------------------------------------------------------------------
 set(DAEMON_SRCS
-    src/core/webtransportd.c
-    src/core/autocert.c
-    src/core/child_process.c
-    src/core/cmdline.c
-    src/core/peer_session.c
-    src/core/frame.c
-    src/core/log.c
+    src/app/main.c
+    src/domain/session.c
+    src/domain/frame.c
+    src/domain/work_queue.c
+    src/adapters/transport_picoquic.c
+    src/adapters/child_output.c
+    src/adapters/autocert.c
+    src/adapters/child_process.c
+    src/adapters/log.c
+    src/app/cmdline.c
 )
 
 # ---------------------------------------------------------------------------
@@ -200,7 +208,7 @@ endif()
 # ---------------------------------------------------------------------------
 # Examples
 # ---------------------------------------------------------------------------
-add_executable(echo examples/echo.c src/core/frame.c)
+add_executable(echo examples/echo.c src/domain/frame.c)
 target_include_directories(echo PRIVATE src/include)
 set_target_properties(echo PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/examples")
@@ -236,17 +244,22 @@ function(add_unit_test name)
 endfunction()
 
 # Unit tests — our code only
-add_unit_test(frame_test         src/core/frame.c)
-add_unit_test(frame_fuzz_test    src/core/frame.c)
-add_unit_test(frame_helper_test  src/core/frame.c)
-add_unit_test(log_test           src/core/log.c)
-add_unit_test(env_test           src/core/env.c)
-add_unit_test(cmdline_test       src/core/cmdline.c)
-add_unit_test(peer_session_test  src/core/peer_session.c src/core/frame.c)
-add_unit_test(child_process_test src/core/child_process.c src/core/cmdline.c)
+add_unit_test(frame_test         src/domain/frame.c)
+add_unit_test(frame_fuzz_test    src/domain/frame.c)
+add_unit_test(frame_helper_test  src/domain/frame.c)
+add_unit_test(log_test           src/adapters/log.c)
+add_unit_test(env_test           src/adapters/env.c)
+add_unit_test(cmdline_test       src/app/cmdline.c)
+add_unit_test(work_queue_test    src/domain/work_queue.c)
+add_unit_test(session_test       src/domain/session.c src/domain/work_queue.c
+                                 src/domain/frame.c src/adapters/log.c)
+add_unit_test(child_output_test  src/adapters/child_output.c src/domain/session.c
+                                 src/domain/work_queue.c src/domain/frame.c
+                                 src/adapters/log.c)
+add_unit_test(child_process_test src/adapters/child_process.c src/app/cmdline.c)
 
 # autocert needs mbedtls so use the vendor helper
-add_vendor_test(autocert_test src/core/autocert.c)
+add_vendor_test(autocert_test src/adapters/autocert.c)
 
 # Exec tests — self-contained, just exec ./webtransportd
 foreach(_t version_test selftest_test help_test)
@@ -288,7 +301,8 @@ endforeach()
 # LSAN suppressions
 set_tests_properties(
     frame_test frame_fuzz_test frame_helper_test log_test env_test
-    cmdline_test peer_session_test child_process_test autocert_test
+    cmdline_test work_queue_test session_test child_output_test
+    child_process_test autocert_test
     version_test selftest_test help_test windows_manifest_test
     picoquic_link_test picoquic_create_test handshake_test
     handshake_echo_test handshake_concurrent_test handshake_static_test
